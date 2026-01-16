@@ -184,6 +184,14 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body("Refresh token is required.");
         }
+        // 🔴 RefreshToken이 JWT 자체로 유효한지 검증이 없음
+        //  위조된 토큰도 DB에 있으면 통과 가능해서 추가
+
+      if (!jwtUtil.validateToken(refreshToken)) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body("Invalid refresh token.");
+    }
+
 
         // RefreshToken 유효성 + 만료 체크
         Optional<RefreshToken> optionalToken = rtRepo.findByToken(refreshToken)
@@ -270,12 +278,16 @@ public class AuthController {
                         .toString()
                         .replace("-", "")
                         .substring(0, 16));
-                user.setPassword("");   // ⚠ (추후 null 권장)
+                user.setPassword(null);  // 🔴 소셜 로그인 계정은 password가 없어야 함
                 user.setRole("user");
                 user.setSnsProvider("google");
                 user.setIsActive(true);
-                user.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
-                user.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
+
+                // 🔴 createdAt / updatedAt 직접 세팅하면 안 됨
+                // 👉 Entity @PrePersist / DB default에 맡기는 게 정답
+                // user.setCreatedAt(...)
+                // user.setUpdatedAt(...)
+
 
                 user = userRepo.save(user);
             }
@@ -290,7 +302,13 @@ public class AuthController {
             String accessToken =
                     jwtUtil.generateToken(user.getEmail(), user.getRole(), companyId, 15);
             String refreshToken =
-                    jwtUtil.generateToken(user.getEmail(), user.getRole(), companyId, 15);
+                    jwtUtil.generateToken(user.getEmail(), user.getRole(), companyId, 60 * 24 * 7);
+
+            // 🔴 기존 RefreshToken 삭제 안 하면 토큰 누적됨
+
+        rtRepo.deleteByUsername(user.getEmail());
+
+
 
             // RefreshToken 저장
             RefreshToken rt = new RefreshToken();
