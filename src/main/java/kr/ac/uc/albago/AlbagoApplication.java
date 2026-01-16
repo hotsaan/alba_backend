@@ -1,15 +1,15 @@
-package kr.ac.uc.albago;
+	package kr.ac.uc.albago;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.ComponentScan;
+	import org.springframework.boot.SpringApplication;
+	import org.springframework.boot.autoconfigure.SpringBootApplication;
+	import org.springframework.context.annotation.ComponentScan;
 
-@SpringBootApplication
+	@SpringBootApplication
 
-public class AlbagoApplication {
+	public class AlbagoApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(AlbagoApplication.class, args);
+		public static void main(String[] args) {
+			SpringApplication.run(AlbagoApplication.class, args);
+		}
+
 	}
-
-}
