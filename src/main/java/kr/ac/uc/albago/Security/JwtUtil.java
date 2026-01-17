@@ -23,18 +23,58 @@ public class JwtUtil {
     public void init() {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
     }
+//
+//    // JWT 토큰 생성 (username, role, companyId 포함)
+//    public String generateToken(String username, String role, String companyId, int minutes) {
+//        return Jwts.builder()
+//                .setSubject(username)
+//                .claim("role", "ROLE_" + role.toUpperCase())
+//                .claim("companyId", companyId)
+//                .setIssuedAt(new Date())
+//                .setExpiration(new Date(System.currentTimeMillis() + minutes * 60 * 1000))
+//                .signWith(secretKey, SignatureAlgorithm.HS256)
+//                .compact();
+//    }
+// JwtUtil.java
+public String generateAccessToken(String email, String role, String companyId, int minutes) {
+    return Jwts.builder()
+            .setSubject(email)
+            .claim("type", "ACCESS")
+            .claim("role", "ROLE_" + role.toUpperCase())
+            .claim("companyId", companyId)
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(System.currentTimeMillis() + minutes * 60L * 1000L))
+            .signWith(secretKey, SignatureAlgorithm.HS256)
+            .compact();
+}
 
-    // JWT 토큰 생성 (username, role, companyId 포함)
-    public String generateToken(String username, String role, String companyId, int minutes) {
+    public String generateRefreshToken(String email, int days) {
         return Jwts.builder()
-                .setSubject(username)
-                .claim("role", "ROLE_" + role.toUpperCase())
-                .claim("companyId", companyId)
+                .setSubject(email)
+                .claim("type", "REFRESH")
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + minutes * 60 * 1000))
+                .setExpiration(new Date(System.currentTimeMillis() + days * 24L * 60L * 60L * 1000L))
                 .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
+
+    public String extractTokenType(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("type", String.class);
+    }
+
+    public boolean isAccessToken(String token) {
+        return "ACCESS".equals(extractTokenType(token));
+    }
+
+    public boolean isRefreshToken(String token) {
+        return "REFRESH".equals(extractTokenType(token));
+    }
+
 
     // companyId 추출
     public String extractCompanyId(String token) {
@@ -45,15 +85,9 @@ public class JwtUtil {
                 .getBody()
                 .get("companyId", String.class);
     }
-
-    // username (subject) 추출
-    public String extractUsername(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(secretKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+    // 이메일(subject) 추출
+    public String extractEmail(String token) {
+        return extractAllClaims(token).getSubject();
     }
 
     // role 추출
@@ -79,10 +113,6 @@ public class JwtUtil {
         }
     }
 
-    // 이메일(subject) 추출
-    public String extractEmail(String token) {
-        return extractAllClaims(token).getSubject();
-    }
 
     // 모든 클레임 추출
     private Claims extractAllClaims(String token) {

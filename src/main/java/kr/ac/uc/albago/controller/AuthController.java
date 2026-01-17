@@ -8,6 +8,7 @@ import jakarta.transaction.Transactional;
 import kr.ac.uc.albago.Service.AuthService;
 import kr.ac.uc.albago.Security.JwtUtil;
 import kr.ac.uc.albago.dto.LoginResponse;
+import kr.ac.uc.albago.dto.RegisterRequest;
 import kr.ac.uc.albago.entity.RefreshToken;
 import kr.ac.uc.albago.entity.UserEntity;
 import kr.ac.uc.albago.repository.RefreshTokenRepository;
@@ -89,86 +90,54 @@ public class AuthController {
     //  - isPartial=false : 실제 회원가입
     // =====================================================
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(
-            @RequestBody UserEntity user,
-            @RequestParam(name = "isPartial", required = false) Boolean isPartial
-    ) {
 
-        Map<String, String> errors = new HashMap<>();
-
-        // ---------- 아이디 검증 ----------
-        if (user.getUserId() == null || user.getUserId().isBlank()) {
-            errors.put("userId", "ID is required.");
-        } else if (!user.getUserId().matches("^[a-zA-Z][a-zA-Z0-9]{3,19}$")) {
-            errors.put("userId", "Must start with a letter and be 4–20 chars.");
-        } else if (userRepo.existsByUserId(user.getUserId())) {
-            errors.put("userId", "That ID is already in use.");
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        System.out.println(" register 접근");
+        // ===== 필수값 최소 검증 (백엔드 책임) =====
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            return ResponseEntity.badRequest().body("Email is required.");
         }
 
-        // ---------- 전체 회원가입일 때만 검증 ----------
-        if (isPartial == null || !isPartial) {
-
-            // 이메일 검증
-            if (user.getEmail() == null || user.getEmail().isBlank()) {
-                errors.put("email", "Email is required.");
-            } else if (!EMAIL_PATTERN.matcher(user.getEmail()).matches()) {
-                errors.put("email", "Invalid email format.");
-            } else if (userRepo.existsByEmail(user.getEmail())) {
-                errors.put("email", "That email is already registered.");
-            }
-
-            // 비밀번호 검증
-            if (user.getPassword() == null || user.getPassword().isBlank()) {
-                errors.put("password", "Password is required.");
-            }
-
-            // 닉네임 검증
-            if (user.getUsername() == null || user.getUsername().isBlank()) {
-                errors.put("username", "Username is required.");
-            }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            return ResponseEntity.badRequest().body("Password is required.");
         }
 
-        // ---------- 에러 반환 ----------
-        if (!errors.isEmpty()) {
-            return ResponseEntity.ok(Map.of(
-                    "success", false,
-                    "errors", errors
-            ));
+        if (request.getUsername() == null || request.getUsername().isBlank()) {
+            return ResponseEntity.badRequest().body("Username is required.");
         }
 
-        // ---------- 중복 체크만 하는 경우 ----------
-        if (isPartial != null && isPartial) {
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "ID and Email are available."
-            ));
+        // ===== 이메일 중복 최종 검증 =====
+        if (userRepo.existsByEmail(request.getEmail())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("That email is already registered.");
         }
 
-        // ---------- 실제 회원가입 처리 ----------
-        user.setPassword(passwordEncoder.encode(user.getPassword())); // 비밀번호 암호화
-        user.setLastLogin(null);
+        // ===== UserEntity 생성 =====
+        UserEntity user = new UserEntity();
+        user.setEmail(request.getEmail());
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        // 기본값 세팅
-        if (user.getAge() == null) user.setAge(0);
-        if (user.getPhoneNumber() == null) user.setPhoneNumber("");
-        if (user.getAddress() == null) user.setAddress("");
-        if (user.getBusinessInfo() == null) user.setBusinessInfo("");
 
-        // 역할 기본값
-        if (user.getRole() == null ||
-                (!user.getRole().equals("user") && !user.getRole().equals("employer"))) {
-            user.setRole("user");
-        }
+        // role은 프론트에서 선택되지만,
+        // 누락/비정상 요청 대비 서버 기본값 보정
+        // role 기본값
+        user.setRole(
+                request.getRole() == null ? "user" : request.getRole().toLowerCase()
+        );
 
-        if (user.getIsActive() == null) user.setIsActive(true);
-        if (user.getSnsProvider() == null) user.setSnsProvider("none");
+        user.setIsActive(true);
+        user.setSnsProvider("none");
 
-        // DB 저장
+        // ⚠ userId는 여기서 안 만듦
+        // → @PrePersist에서 UUID 자동 생성됨
+
         UserEntity saved = userRepo.save(user);
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "user", saved
+                "email", saved.getEmail(),
+                "userId", saved.getUserId()
         ));
     }
 
@@ -212,7 +181,7 @@ public class AuthController {
 
             // 새 AccessToken 발급
             String newAccessToken =
-                    jwtUtil.generateToken(email, role, companyId, 15);
+                    jwtUtil.generateAccessToken(email, role, companyId, 15);
 
             return ResponseEntity.ok(Map.of(
                     "accessToken", newAccessToken,
@@ -300,11 +269,9 @@ public class AuthController {
 
             // 토큰 발급
             String accessToken =
-                    jwtUtil.generateToken(user.getEmail(), user.getRole(), companyId, 15);
+                    jwtUtil.generateAccessToken(user.getEmail(), user.getRole(), companyId, 15);
             String refreshToken =
-                    jwtUtil.generateToken(user.getEmail(), user.getRole(), companyId, 60 * 24 * 7);
-
-            // 🔴 기존 RefreshToken 삭제 안 하면 토큰 누적됨
+                    jwtUtil.generateRefreshToken(user.getEmail(), 7);
 
         rtRepo.deleteByUsername(user.getEmail());
 

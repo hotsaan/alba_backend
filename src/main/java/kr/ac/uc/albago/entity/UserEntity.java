@@ -39,6 +39,11 @@ public class UserEntity {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "username")
+    private String username;
+
+    private String role;
+
     private Integer age;
 
     @Column(name = "phone_number")
@@ -49,8 +54,6 @@ public class UserEntity {
 
     @Column(name = "business_info", columnDefinition = "TEXT")
     private String businessInfo;
-
-    private String role;
 
     @Column(name = "is_active", columnDefinition = "TINYINT(1) DEFAULT 1")
     private Boolean isActive;
@@ -63,9 +66,6 @@ public class UserEntity {
 
     @Column(name = "last_login")
     private Timestamp lastLogin;
-
-    @Column(name = "username")
-    private String username;
 
     @Column(name = "about_me", columnDefinition = "TEXT")
     private String aboutMe;

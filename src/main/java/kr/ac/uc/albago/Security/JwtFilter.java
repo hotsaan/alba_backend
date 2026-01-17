@@ -29,28 +29,30 @@ public class JwtFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7); // Bearer 잘라내기
+            String token = header.substring(7); // "Bearer " 제거
 
-            if (jwtUtil.validateToken(token)) {
-                String username = jwtUtil.extractUsername(token);
-                String role = jwtUtil.extractRole(token); // ex: "EMPLOYER" or "ROLE_EMPLOYER"
+            // 토큰 유효 + ACCESS 토큰만 인증 처리
+            if (jwtUtil.validateToken(token) && jwtUtil.isAccessToken(token)) {
 
-                // ROLE_ 접두사 없으면 붙이기
+                String email = jwtUtil.extractEmail(token);   // subject
+                String role  = jwtUtil.extractRole(token);    // ROLE_USER 등
+
                 if (!role.startsWith("ROLE_")) {
                     role = "ROLE_" + role;
                 }
 
-                List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
+                List<GrantedAuthority> authorities =
+                        List.of(new SimpleGrantedAuthority(role));
 
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(username, null, authorities);
+                        new UsernamePasswordAuthenticationToken(
+                                email,
+                                null,
+                                authorities
+                        );
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-
-                // 디버깅 로그
-                System.out.println("JwtFilter: Authorization header = " + header);
-                System.out.println("JwtFilter: Extracted role = " + role);
-                System.out.println("JwtFilter: Granted authorities = " + authorities);
+                SecurityContextHolder.getContext()
+                        .setAuthentication(authentication);
             }
         }
 
@@ -60,9 +62,10 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
+
         return path.startsWith("/api/login")
                 || path.startsWith("/api/register")
                 || path.startsWith("/api/refresh")
-                || path.startsWith("/api/google-login"); // 구글 로그인도 예외처리 필요
+                || path.startsWith("/api/google-login");
     }
 }
