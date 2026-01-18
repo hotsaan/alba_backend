@@ -19,9 +19,6 @@ import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
-
-
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -68,7 +65,7 @@ public class AuthController {
 
         // 필수값 검증
         if (email == null || password == null) {
-            return ResponseEntity.badRequest().body("Email and password are required.");
+            return ResponseEntity.badRequest().body("이메일과 비밀번호를 입력해주세요");
         }
 
         // 로그인 시도
@@ -90,10 +87,34 @@ public class AuthController {
     //  - isPartial=false : 실제 회원가입
     // =====================================================
     @PostMapping("/register")
-
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        System.out.println(" register 접근");
-        // ===== 필수값 최소 검증 (백엔드 책임) =====
+
+        System.out.println("partial = " + request.getPartial());
+        System.out.println("username = " + request.getUsername());
+        System.out.println("email = " + request.getEmail());
+
+
+        // =========================
+        // 1️⃣ 부분 요청 (중복 체크)
+        // =========================
+        if (Boolean.TRUE.equals(request.getPartial())) {
+
+
+            if (request.getUsername() == null || request.getUsername().isBlank()) {
+                return ResponseEntity.badRequest().body("아이디를 입력해주세요");
+            }
+
+            boolean exists = userRepo.existsByUsername(request.getUsername());
+
+            return ResponseEntity.ok(Map.of(
+                    "success", !exists
+            ));
+
+        }
+
+        // =========================
+        // 2️⃣ 실제 회원가입
+        // =========================
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             return ResponseEntity.badRequest().body("Email is required.");
         }
@@ -106,31 +127,22 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Username is required.");
         }
 
-        // ===== 이메일 중복 최종 검증 =====
         if (userRepo.existsByEmail(request.getEmail())) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body("That email is already registered.");
         }
 
-        // ===== UserEntity 생성 =====
         UserEntity user = new UserEntity();
         user.setEmail(request.getEmail());
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-
-        // role은 프론트에서 선택되지만,
-        // 누락/비정상 요청 대비 서버 기본값 보정
-        // role 기본값
         user.setRole(
                 request.getRole() == null ? "user" : request.getRole().toLowerCase()
         );
 
         user.setIsActive(true);
         user.setSnsProvider("none");
-
-        // ⚠ userId는 여기서 안 만듦
-        // → @PrePersist에서 UUID 자동 생성됨
+        user.setIsPartial(false);   // ⭐
 
         UserEntity saved = userRepo.save(user);
 
@@ -140,6 +152,7 @@ public class AuthController {
                 "userId", saved.getUserId()
         ));
     }
+
 
     // =====================================================
     // 3 AccessToken 재발급 (RefreshToken 사용)

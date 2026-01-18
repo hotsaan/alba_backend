@@ -58,6 +58,9 @@ public class UserEntity {
     @Column(name = "is_active", columnDefinition = "TINYINT(1) DEFAULT 1")
     private Boolean isActive;
 
+    @Column(name = "is_partial", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean isPartial;
+
     @Column(name = "profile_image_url", columnDefinition = "TEXT")
     private String profileImageUrl;
 
