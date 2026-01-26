@@ -24,22 +24,19 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
 
         String header = request.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7); // "Bearer " 제거
+            String token = header.substring(7);
 
-            // 토큰 유효 + ACCESS 토큰만 인증 처리
             if (jwtUtil.validateToken(token) && jwtUtil.isAccessToken(token)) {
 
-                String email = jwtUtil.extractEmail(token);   // subject
-                String role  = jwtUtil.extractRole(token);    // ROLE_USER 등
-
-                if (!role.startsWith("ROLE_")) {
-                    role = "ROLE_" + role;
-                }
+                String email = jwtUtil.extractEmail(token);
+                String role  = jwtUtil.extractRole(token);
+                String companyId = jwtUtil.extractCompanyId(token);
 
                 List<GrantedAuthority> authorities =
                         List.of(new SimpleGrantedAuthority(role));
@@ -51,8 +48,10 @@ public class JwtFilter extends OncePerRequestFilter {
                                 authorities
                         );
 
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authentication);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                // ✅ Service에서 쓰기 위해 request에 심기
+                request.setAttribute("companyId", companyId);
             }
         }
 

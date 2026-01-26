@@ -40,7 +40,7 @@ public String generateAccessToken(String email, String role, String companyId, i
     return Jwts.builder()
             .setSubject(email)
             .claim("type", "ACCESS")
-            .claim("role", "ROLE_" + role.toUpperCase())
+            .claim("role", role.toLowerCase())
             .claim("companyId", companyId)
             .setIssuedAt(new Date())
             .setExpiration(new Date(System.currentTimeMillis() + minutes * 60L * 1000L))
